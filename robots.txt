@@ -1,6 +1,5 @@
 User-agent: *
 Allow: /
 Disallow: /demo/
-Disallow: /kb/
 
 Sitemap: https://www.alabamaresourcedirectory.com/sitemap.xml
