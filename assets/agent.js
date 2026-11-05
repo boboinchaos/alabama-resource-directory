@@ -5,7 +5,7 @@
 const NEED_WORDS={power:/\b(power|electric|light bill|lights (are |were |got )?(off|cut)|alabama power)/i,water:/\bwater\b/i,gas:/\b(gas bill|gas|heat|heating|propane|spire)\b/i,plumbing:/\b(plumb|pipe|leak|sewer|toilet|no running water)/i,roof:/\b(roof|shingles?|ceiling (is )?leak|leaking ceiling|home repairs?|house repairs?|repair (my|the|her|his) (house|home)|tarp)\b/i,
  food:/\b(food|hungry|groceries|grocery|pantry|eat|meals?|snap|food stamps)\b/i,rent:/\b(rent|evict|eviction|landlord|mortgage|behind on (the )?house|housing)\b/i,shelter:/\b(homeless|shelter|place to (stay|sleep|live)|nowhere to (stay|live|sleep|go)|living in (my|a|the|her|his) car|sleeping (outside|in (my|a|the|her|his) car)|on the streets?|kicked out|couch ?surfing|unhoused)\b/i,
  clothing:/\b(cloth|clothes|clothing|coat|coats|shoes|jacket)\b/i,furniture:/\b(furniture|bed|beds|mattress|couch|sofa|table|chairs?)\b/i,transport:/\b(ride|rides|transport|transportation|bus|car broke|no car|get to (the )?(doctor|appointments?|work))\b/i,
- equipment:/\b(wheelchair|walker|scooter|hospital bed|ramp|shower chair|lift|equipment|cane|oxygen)\b/i,respite:/\b(respite|caregiver|care giver|a break|break from|sitter|adult day|take care of (my|her|his))\b/i,
+ equipment:/\b(wheelchair|walker|scooter|hospital bed|ramp|shower chair|lift|equipment|cane|oxygen|prosthe\w*|artificial (leg|arm|limb)|amputee|amputation|limb loss|brace|orthotic\w*|power chair)\b/i,respite:/\b(respite|caregiver|care giver|a break|break from|sitter|adult day|take care of (my|her|his))\b/i,
  benefits:/\b(social security|ssi|ssdi|disability check|medicaid|medicare|benefits)\b/i,health:/\b(doctor|clinic|medical|medicine|prescriptions?|dental|dentist|teeth|tooth|sick|health care|no insurance|uninsured)\b/i,foster:/\b(foster|kinship|grand(kids?|child|children|sons?|daughters?)|raising (my|her|his|their) (niece|nephew|sister|brother)|aging out|aged out|adopt\w*|custody|placed (with|in)|placement|casa)\b/i,job:/\b(job|work|unemploy|laid off|lost (my|her|his) (job|hours)|income)\b/i};
 var D=null, ctx={county:null,need:null}, speakOn=false, rec=null, listening=false;
 var $=function(s,r){return (r||document).querySelector(s)};
@@ -94,13 +94,13 @@ function findCounty(q){
   Object.keys(D.counties).forEach(function(slug){ var n=D.counties[slug].toLowerCase(); if(best||n.length<4) return; if(n==='mobile'){ if(/\b(in|near|around|from) mobile\b/.test(t)) best=slug; return; } if(t.indexOf(' '+n+' ')>-1) best=slug; });
   return best;
 }
-var EXTRA={power:/\b(electricity|power company|light company|utility bill|utilities|lights? (off|cut|shut))\b/i,food:/\b(starving|feed my|meal|lunch|dinner|breakfast|pantries)\b/i,rent:/\b(apartment|lease|behind on rent|section 8|public housing)\b/i,shelter:/\b(sleep tonight|stay tonight|motel|warming (station|center))\b/i,health:/\b(hospital|prescription|medicine|glasses|eye doctor|mental health|counseling)\b/i,transport:/\b(get to my appointment|medical ride|bus pass|gas money|car repair)\b/i,job:/\b(employment|hiring|career|resume|training)\b/i,furniture:/\b(crib|dresser|appliance|stove|refrigerator|fridge)\b/i,equipment:/\b(handicap|ramp|grab bars?|hearing aid|cpap)\b/i,benefits:/\b(snap|ebt|disability benefits|food stamps|wic)\b/i,water:/\b(water bill|water company|water (is |got )?(off|cut|shut))\b/i};
+var EXTRA={power:/\b(electricity|power company|light company|utility bill|utilities|lights? (off|cut|shut))\b/i,food:/\b(starving|feed my|meal|lunch|dinner|breakfast|pantries)\b/i,rent:/\b(apartment|lease|behind on rent|section 8|public housing)\b/i,shelter:/\b(sleep tonight|stay tonight|motel|warming (station|center))\b/i,health:/\b(hospital|prescription|medicine|glasses|eye doctor|mental health|counseling)\b/i,transport:/\b(get to my appointment|medical ride|bus pass|gas money|car repair)\b/i,job:/\b(employment|hiring|career|resume|training)\b/i,furniture:/\b(crib|dresser|appliance|stove|refrigerator|fridge)\b/i,equipment:/\b(handicap|ramps?|grab ?bars?|hand ?rails?|railings?|home modifications?|stair ?lift|hearing aid|cpap|prosthe\w*|amputee)\b/i,benefits:/\b(snap|ebt|disability benefits|food stamps|wic)\b/i,water:/\b(water bill|water company|water (is |got )?(off|cut|shut))\b/i};
 function findNeeds(q){ var hits=[]; Object.keys(NEED_WORDS).forEach(function(k){ if(!D.needs[k]) return; var m=q.match(NEED_WORDS[k])||(EXTRA[k]&&q.match(EXTRA[k])); if(m) hits.push([m.index,k]); });
   // "water" inside "water bill" also matches plumbing etc.: earliest mention wins, bills beat repairs on ties
   hits.sort(function(a,b){return a[0]-b[0]}); return hits.map(function(h){return h[1]}); }
 
 function ask(q){
-  me(q);
+  me(q); ctx.lastQ=q;
   load(function(){
     if(!ctx.county&&pageContext().county) ctx.county=pageContext().county;
     if(/\b(suicid|kill myself|end my life|want to die|hurt myself)\b/i.test(q)){ bot('Please call or text <a class="ph" href="tel:988">988</a> right now, the Suicide and Crisis Lifeline. It\'s free and open 24/7. If you\'re in danger, call <a class="ph" href="tel:911">911</a>.','Please call or text 9 8 8 right now. It is free and open all day and night. If you are in danger, call 9 1 1.'); return; }
@@ -132,12 +132,14 @@ function countyMenu(){
 }
 function answer(){
   var cslug=ctx.county, nid=ctx.need, name=D.counties[cslug], meta=D.needs[nid];
-  var list=(D.top[cslug]||{})[nid]||[], total=(D.counts[cslug]||{})[nid]||0, url='/alabama/'+cslug+'/'+meta.s+'/';
+  var T=D.top[cslug]||{}, list=T[nid]||[], total=(D.counts[cslug]||{})[nid]||0, url='/alabama/'+cslug+'/'+meta.s+'/';
+  if(nid==='equipment'){ var sub=null; if(/\b(ramps?|hand ?rails?|railings?|grab ?bars?|home modif\w*|widen\w* (the )?doors?|walk-in shower|stair ?lift)\b/i.test(ctx.lastQ||'')&&T._ramp&&T._ramp.length){ list=T._ramp; sub='Ramps, Handrails and Home Accessibility'; } else if(/prosthe|artificial|amput|limb|blade/i.test(ctx.lastQ||'')&&T._prosth&&T._prosth.length) list=T._prosth; else if(/wheelchair|power chair|scooter|walker|cane|crutch|hospital bed|shower chair|lift chair|commode/i.test(ctx.lastQ||'')&&T._wheel&&T._wheel.length) list=T._wheel; }
   if(!list.length){ bot('I don\'t have '+esc(meta.t.toLowerCase())+' listed for '+esc(name)+' County yet. Call <a class="ph" href="tel:211">2-1-1</a>, Alabama\'s free help line, or <a href="/alabama/'+cslug+'/">see everything in '+esc(name)+' County</a>.'); return; }
-  var html='<b>'+esc(meta.t)+' in '+esc(name)+' County</b>, start with these:<ul>'+list.map(function(r){
+  var title=(typeof sub!=='undefined'&&sub)||meta.t;
+  var html='<b>'+esc(title)+' in '+esc(name)+' County</b>, start with these:<ul>'+list.map(function(r){
     return '<li><b>'+esc(r[0])+'</b>'+(r[3]?' <span style="color:#5bd1a0">(local)</span>':'')+'<br>'+(r[2]?'<a class="ph" href="tel:'+esc(r[2])+'">'+esc(r[1])+'</a>':(r[5]?'<a href="'+esc(r[5])+'" target="_blank" rel="noopener nofollow">No phone listed · Website ↗</a>':esc(r[1])))+(r[4]?'<br><span style="color:#a9bdd4">'+esc(r[4])+'</span>':'')+'</li>'}).join('')+'</ul>'+
     '<a href="'+url+'">See all '+total+' programs, with who qualifies and what to bring</a>'+chips(['What should I bring?','Other help in '+name+' County']);
-  var spoken=meta.t+' in '+name+' County. '+list.slice(0,2).map(function(r,i){return (i+1)+'. '+r[0]+'. '+(r[2]?'Phone '+sayPhone(r[2]):'')}).join('. ')+'. There are '+total+' programs in all, and the full list is on screen. What else can I help with?';
+  var spoken=title+' in '+name+' County. '+list.slice(0,2).map(function(r,i){return (i+1)+'. '+r[0]+'. '+(r[2]?'Phone '+sayPhone(r[2]):'')}).join('. ')+'. There are '+total+' programs in all, and the full list is on screen. What else can I help with?';
   bot(html,spoken);
 }
 function sayPhone(t){t=String(t).replace(/\D/g,'');if(t.length===11&&t[0]==='1')t=t.slice(1);return t.length===10?[t.slice(0,3),t.slice(3,6),t.slice(6)].map(function(g){return g.split('').join(' ')}).join(', '):t.split('').join(' ');}
