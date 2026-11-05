@@ -37,9 +37,9 @@ function build(){
    '<form class="ask-form" id="askForm"><input id="askIn" autocomplete="off" placeholder="e.g. help with my power bill in Shelby County" aria-label="Your question"><button type="button" class="ask-talk" id="askTalk" aria-label="Talk instead of typing">'+micSvg+'</button><button class="ask-send" type="submit">Ask</button></form>';
   document.body.appendChild(p);
   $('#askOpen').onclick=function(){open(false)}; $('#askVoice').onclick=function(){open(true)};
-  $('#askClose').onclick=function(){p.hidden=true;stopTalk();if(window.speechSynthesis)speechSynthesis.cancel();$('#askOpen').focus()};
-  $('#askForm').onsubmit=function(e){e.preventDefault();var v=$('#askIn').value.trim();if(!v)return;$('#askIn').value='';ask(v)};
-  $('#askTalk').onclick=function(){listening?stopTalk():talk()};
+  $('#askClose').onclick=function(){p.hidden=true;voiceMode=false;stopTalk();if(window.speechSynthesis)speechSynthesis.cancel();$('#askOpen').focus()};
+  $('#askForm').onsubmit=function(e){e.preventDefault();if(!listening)voiceMode=false;var v=$('#askIn').value.trim();if(!v)return;$('#askIn').value='';ask(v)};
+  $('#askTalk').onclick=function(){ if(listening){voiceMode=false;stopTalk();} else { voiceMode=true; $('#askSpeak').checked=speakOn=true; talk(); } };
   $('#askSpeak').onchange=function(){speakOn=this.checked;if(!speakOn&&window.speechSynthesis)speechSynthesis.cancel()};
   document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!p.hidden)$('#askClose').click()});
   document.addEventListener('click',function(e){var c=e.target.closest('.ask-chip');if(c)ask(c.dataset.q)});
@@ -50,7 +50,7 @@ function open(voice){
     var here=pageContext(); if(here.county) ctx.county=here.county; if(here.need) ctx.need=here.need;
     bot('Hi! Tell me what you need help with and your county or city. For example: <i>"Can\'t pay my light bill in Tuscaloosa"</i> or <i>"food pantry near Dothan."</i>'+chips(['Power bill help','Food pantry','Rent help','Shelter tonight']));
   }
-  if(voice){ $('#askSpeak').checked=speakOn=true; talk(); } else $('#askIn').focus();
+  if(voice){ $('#askSpeak').checked=speakOn=true; voiceMode=true; talk(); } else { voiceMode=false; $('#askIn').focus(); }
 }
 function pageContext(){ var m=location.pathname.match(/^\/alabama\/([^\/]+)\/(?:([^\/]+)\/)?/), o={};
   if(m){o.county=m[1]; if(m[2]) o.needSlug=m[2];}
@@ -63,7 +63,11 @@ function bot(html,spoken){add(html,'bot'); if(speakOn) speak(spoken||html.replac
 function say(t){bot(esc(t),t)}
 
 /* ---------- voice ---------- */
-function speak(t){ if(!window.speechSynthesis) return; speechSynthesis.cancel(); var u=new SpeechSynthesisUtterance(t.replace(/↗/g,'').slice(0,900)); u.rate=1; u.lang='en-US'; speechSynthesis.speak(u); }
+var VOICE=null; function pickVoice(){ if(!window.speechSynthesis) return null; var v=speechSynthesis.getVoices().filter(function(x){return /^en(-|_)US/i.test(x.lang)}); var pref=[/Natural/i,/Google US English/i,/Samantha/i,/Aria|Jenny|Ava|Allison/i,/Zira/i]; for(var i=0;i<pref.length;i++){ var f=v.find(function(x){return pref[i].test(x.name)}); if(f) return f; } return v[0]||null; }
+if(window.speechSynthesis){ speechSynthesis.onvoiceschanged=function(){VOICE=pickVoice()}; VOICE=pickVoice(); }
+var voiceMode=false;
+function speak(t){ if(!window.speechSynthesis) return; speechSynthesis.cancel(); var u=new SpeechSynthesisUtterance(t.replace(/↗/g,'').replace(/\(local\)/g,'').slice(0,700)); u.rate=0.95; u.pitch=1; u.lang='en-US'; if(VOICE||(VOICE=pickVoice())) u.voice=VOICE;
+  u.onend=function(){ if(voiceMode&&!$('.ask-panel').hidden&&!listening) setTimeout(talk,350); }; speechSynthesis.speak(u); }
 function talk(){
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ say('Voice isn\'t available in this browser. Chrome, Edge and Safari support it, or you can type your question.'); return; }
@@ -71,7 +75,7 @@ function talk(){
   rec=new SR(); rec.lang='en-US'; rec.interimResults=true; rec.maxAlternatives=1;
   var final='';
   rec.onresult=function(e){var t='';for(var i=e.resultIndex;i<e.results.length;i++){t+=e.results[i][0].transcript; if(e.results[i].isFinal) final+=e.results[i][0].transcript;} $('#askIn').value=final||t;};
-  rec.onerror=function(e){ stopTalk(); if(e.error==='not-allowed'||e.error==='service-not-allowed') say('I need permission to use your microphone. Allow it in your browser, or type your question.'); };
+  rec.onerror=function(e){ if(e.error==='no-speech'){ voiceMode=false; } stopTalk(); if(e.error==='not-allowed'||e.error==='service-not-allowed') say('I need permission to use your microphone. Allow it in your browser, or type your question.'); };
   rec.onend=function(){ var v=($('#askIn').value||'').trim(); stopTalk(); if(v){ $('#askIn').value=''; ask(v); } };
   try{ rec.start(); listening=true; $('#askTalk').classList.add('on'); $('#askIn').placeholder='Listening… speak now'; }catch(_){ stopTalk(); }
 }
@@ -90,7 +94,10 @@ function findCounty(q){
   Object.keys(D.counties).forEach(function(slug){ var n=D.counties[slug].toLowerCase(); if(best||n.length<4) return; if(n==='mobile'){ if(/\b(in|near|around|from) mobile\b/.test(t)) best=slug; return; } if(t.indexOf(' '+n+' ')>-1) best=slug; });
   return best;
 }
-function findNeeds(q){ return Object.keys(NEED_WORDS).filter(function(k){return D.needs[k]&&NEED_WORDS[k].test(q)}); }
+var EXTRA={power:/\b(electricity|power company|light company|utility bill|utilities|lights? (off|cut|shut))\b/i,food:/\b(starving|feed my|meal|lunch|dinner|breakfast|pantries)\b/i,rent:/\b(apartment|lease|behind on rent|section 8|public housing)\b/i,shelter:/\b(sleep tonight|stay tonight|motel|warming (station|center))\b/i,health:/\b(hospital|prescription|medicine|glasses|eye doctor|mental health|counseling)\b/i,transport:/\b(get to my appointment|medical ride|bus pass|gas money|car repair)\b/i,job:/\b(employment|hiring|career|resume|training)\b/i,furniture:/\b(crib|dresser|appliance|stove|refrigerator|fridge)\b/i,equipment:/\b(handicap|ramp|grab bars?|hearing aid|cpap)\b/i,benefits:/\b(snap|ebt|disability benefits|food stamps|wic)\b/i,water:/\b(water bill|water company|water (is |got )?(off|cut|shut))\b/i};
+function findNeeds(q){ var hits=[]; Object.keys(NEED_WORDS).forEach(function(k){ if(!D.needs[k]) return; var m=q.match(NEED_WORDS[k])||(EXTRA[k]&&q.match(EXTRA[k])); if(m) hits.push([m.index,k]); });
+  // "water" inside "water bill" also matches plumbing etc.: earliest mention wins, bills beat repairs on ties
+  hits.sort(function(a,b){return a[0]-b[0]}); return hits.map(function(h){return h[1]}); }
 
 function ask(q){
   me(q);
@@ -101,13 +108,16 @@ function ask(q){
     if(/\b(abuse|domestic violence|he hits|she hits|afraid of (my|him|her))\b/i.test(q)){ bot('The Alabama domestic violence hotline is free and confidential, 24/7: <a class="ph" href="tel:18006506522">1-800-650-6522</a>. National hotline: <a class="ph" href="tel:18007997233">1-800-799-7233</a>. In danger right now? Call <a class="ph" href="tel:911">911</a>.'); }
     var c=findCounty(q), n=findNeeds(q);
     if(c) ctx.county=c;
+    var followUp=/\b(what (do|should) i (bring|need)|documents?|paperwork|proof|more|another|other (one|ones|options)|next|what else|anything else)\b/i.test(q);
     if(n.length) ctx.need=n[0];
-    else if(pageContext().needSlug&&!ctx.need){ var ps=pageContext().needSlug; Object.keys(D.needs).forEach(function(k){ if(D.needs[k].s===ps) ctx.need=k; }); }
+    else if(!followUp) ctx.need=null;
+    if(!ctx.need&&!n.length&&pageContext().needSlug&&!c&&!followUp&&ctx.firstAsk!==false){ var ps=pageContext().needSlug; Object.keys(D.needs).forEach(function(k){ if(D.needs[k].s===ps) ctx.need=k; }); }
     if(/\b(what (do|should) i (bring|need)|documents?|paperwork|proof)\b/i.test(q)){ bring(); return; }
     if(/\b(advertis|sponsor|promote my business)\b/i.test(q)){ bot('You can advertise to families by county or category. See <a href="/advertise/">Advertise with us</a>.'); return; }
     if(/\b(case ?manager|agency|intake|my clients|pro version|for (my )?organization)\b/i.test(q)){ bot('For agencies and advocates, the Pro version adds client intake, a Help Action Plan and PDF email. See <a href="/for-organizations/">Pro features</a>.'); return; }
     if(/^\s*(hi|hello|hey|thanks|thank you|ok|okay)\b/i.test(q)&&!c&&!n.length){ say(/thank/i.test(q)?'You\'re welcome. Anything else I can look up?':'Hi! What do you need help with, and what county or city are you in?'); return; }
     if(!ctx.county&&!ctx.need){ var hits=searchIdx(q); if(hits) return; bot('I can help with bills, food, rent, shelter, repairs, rides, medical care and more. What do you need, and what county or city are you in?'+chips(['Power bill help','Food pantry','Rent help','Shelter tonight'])); return; }
+    ctx.firstAsk=false;
     if(!ctx.county){ bot('What county or city are you in? (For example: Jefferson County, Huntsville, or a ZIP code.)'); return; }
     if(!ctx.need){ countyMenu(); return; }
     answer();
@@ -127,7 +137,7 @@ function answer(){
   var html='<b>'+esc(meta.t)+' in '+esc(name)+' County</b>, start with these:<ul>'+list.map(function(r){
     return '<li><b>'+esc(r[0])+'</b>'+(r[3]?' <span style="color:#5bd1a0">(local)</span>':'')+'<br>'+(r[2]?'<a class="ph" href="tel:'+esc(r[2])+'">'+esc(r[1])+'</a>':(r[5]?'<a href="'+esc(r[5])+'" target="_blank" rel="noopener nofollow">No phone listed · Website ↗</a>':esc(r[1])))+(r[4]?'<br><span style="color:#a9bdd4">'+esc(r[4])+'</span>':'')+'</li>'}).join('')+'</ul>'+
     '<a href="'+url+'">See all '+total+' programs, with who qualifies and what to bring</a>'+chips(['What should I bring?','Other help in '+name+' County']);
-  var spoken=meta.t+' in '+name+' County. '+list.slice(0,3).map(function(r,i){return (i+1)+'. '+r[0]+'. '+(r[2]?'Phone '+sayPhone(r[2]):'')}).join('. ')+'. There are '+total+' programs in all. The full list is on the page.';
+  var spoken=meta.t+' in '+name+' County. '+list.slice(0,2).map(function(r,i){return (i+1)+'. '+r[0]+'. '+(r[2]?'Phone '+sayPhone(r[2]):'')}).join('. ')+'. There are '+total+' programs in all, and the full list is on screen. What else can I help with?';
   bot(html,spoken);
 }
 function sayPhone(t){t=String(t).replace(/\D/g,'');if(t.length===11&&t[0]==='1')t=t.slice(1);return t.length===10?[t.slice(0,3),t.slice(3,6),t.slice(6)].map(function(g){return g.split('').join(' ')}).join(', '):t.split('').join(' ');}
