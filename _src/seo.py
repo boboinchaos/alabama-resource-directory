@@ -140,6 +140,8 @@ SAMPLE = rd(os.path.join(ROOT, "about", "index.html"))
 NAV_OLD = '<a href="/advertise/">Advertise</a><a class="pro" href="/for-organizations/">For organizations</a>'
 NAV_NEW = '<a href="/blog/">Guides</a><a href="/advertise/">Advertise</a><a class="pro" href="/for-organizations/">For organizations</a>'
 OGIMG = DOMAIN + "/assets/og.png"
+import hashlib
+ASSETV = {a: hashlib.md5(open(os.path.join(ROOT, "assets", a), "rb").read()).hexdigest()[:8] for a in ("site.css", "site.js", "agent.js")}
 NEARBAR = ('<div class="nearbar"><div class="wrap"><span>📍 <b>Search by your address</b> and we\'ll list the closest help first, '
            'starting in your neighborhood.</span><a class="btn btn-sm" href="/near/">Find help near me</a></div></div>')
 
@@ -154,6 +156,8 @@ def fix_chrome(s):
             '<meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image">'
             '<meta property="og:locale" content="en_US">' % OGIMG)
     s = put(s, "og", tags, "</head>")
+    for a in ("site.css", "site.js", "agent.js"):
+        s = re.sub(r'(/assets/%s)(\?v=[0-9a-f]+)?"' % re.escape(a), lambda m: m.group(1) + "?v=" + ASSETV[a] + '"', s)
     bar = "" if 'id="nearform"' in s else NEARBAR
     s = put(s, "nearbar", bar, '<main id="main"')
     return s
