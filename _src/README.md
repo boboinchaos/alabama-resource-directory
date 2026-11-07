@@ -17,3 +17,8 @@ the SEO layer on top and can be re-run at any time from the repo root:
 - `parse.py`: pulls listing data back out of the built pages.
 
 If `build.py` regenerates the site, run `seo.py` again afterwards.
+
+## Closest-first address search (/near/)
+- `assets/near.js` geocodes the visitor's address in the browser (OpenStreetMap Nominatim, ZIP fallback) and sorts programs by distance.
+- Program locations: `_src/geo.json` (street-level, from the Census batch geocoder, 1,605 programs); anything not matched falls back to its ZIP center (`_src/al_zips.json`) or town center and shows "approx.".
+- To re-geocode after adding programs: rebuild `_src/geocode_in.csv` (id,street,city,AL,zip), upload it at geocoding.geo.census.gov (Batch, Public_AR_Current), and merge the matched id,lat,lon into `geo.json`.

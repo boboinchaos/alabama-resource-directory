@@ -49,7 +49,7 @@
     var nk = r[5].split(',').filter(function (k) { return NEED[k]; });
     return '<article class="res near"><div class="dist">' + (d < 0.1 ? '<0.1' : d.toFixed(1)) + '<small>mi</small></div><div>' +
       '<h3><a href="' + esc(r[8]) + '">' + esc(r[0]) + '</a></h3>' +
-      '<div>' + nk.slice(0, 4).map(function (k) { return '<span class="badge">' + esc(NEED[k][1]) + '</span>'; }).join('') + (r[7] === 'z' ? '<span class="badge" title="Distance measured from the program\'s ZIP code">approx.</span>' : '') + '</div>' +
+      '<div>' + nk.slice(0, 4).map(function (k) { return '<span class="badge">' + esc(NEED[k][1]) + '</span>'; }).join('') + (r[7] !== 's' ? '<span class="badge" title="Distance measured from the program\'s ZIP code or town">approx.</span>' : '') + '</div>' +
       (r[1] ? '<a class="phone" href="tel:' + esc(r[1].replace(/\D/g, '').slice(0, 10)) + '">' + esc(r[1]) + '</a>' : '') +
       '<p style="margin:6px 0 0"><a href="https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(r[2]) + '" target="_blank" rel="nofollow noopener">' + esc(r[2]) + '</a></p>' +
       (warn ? '<p class="muted" style="font-size:15px;margin:6px 0 0">Based in a neighboring county. Call to ask if they serve your address.</p>' : '') +
