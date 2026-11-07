@@ -73,9 +73,14 @@ footer a{color:var(--mute)}
 .post table{border-collapse:collapse;width:100%;margin:12px 0}.post td,.post th{border:1px solid var(--line);padding:8px;text-align:left}
 .lead label{display:block;font-weight:700;margin:0 0 12px}.lead input,.lead select,.lead textarea{display:block;width:100%;margin-top:6px;font:inherit;padding:12px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink)}
 .nearbar{background:#13304a;border-bottom:1px solid var(--line);font-size:15px}.nearbar .wrap{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding-top:8px;padding-bottom:8px}
-.nearform{background:var(--panel);border:1px solid var(--volt);border-radius:var(--radius);padding:20px;display:grid;grid-template-columns:2fr 1fr auto auto;gap:12px;align-items:end;margin:18px 0 6px}
+.nearform{background:var(--panel);border:1px solid var(--volt);border-radius:var(--radius);padding:20px;display:grid;gap:16px;margin:18px 0 6px}
+.nf-loc{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.nf-loc .nf-a{flex:1;min-width:220px}.nf-or{color:var(--mute);font-weight:700}
+.nf-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 .nearform label{display:block;font-weight:700;font-size:15px;margin-bottom:6px}.nearform input,.nearform select{width:100%;font:inherit;padding:12px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink)}
-@media(max-width:820px){.nearform{grid-template-columns:1fr}}.nf-note{font-size:15px;margin:0 0 18px}
+@media(max-width:620px){.nf-row{grid-template-columns:1fr}.nf-loc{flex-direction:column;align-items:stretch}.nf-or{text-align:center}}
+.nh-title{margin:28px 0 0}
+.nf-note{font-size:15px;margin:0 0 18px}
 .nearhero{margin:22px 0}.found{font-size:18px}.res.near{display:grid;grid-template-columns:70px 1fr;gap:14px}
 .res.near .dist{font:800 24px var(--display);color:var(--volt);text-align:center}.res.near .dist small{display:block;font-size:13px;color:var(--mute)}
 .lead .chk{font-weight:500;font-size:15px;display:flex;gap:10px;align-items:flex-start}.lead .chk input{width:auto;margin-top:4px}

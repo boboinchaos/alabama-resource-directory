@@ -539,11 +539,11 @@ import hashlib
 NEARVER = hashlib.md5(NEARJSON.encode() + rd(os.path.join(ROOT, "assets", "near.js")).encode()).hexdigest()[:8]
 needjs = json.dumps({k: [v["s"], SHORT[k]] for k, v in NEEDS.items()})
 opts = "".join('<option value="%s">%s</option>' % (k, E(v["t"])) for k, v in NEEDS.items())
-NEARFORM = ('<form id="nearform" class="nearform" role="search" aria-label="Find the closest help to your address">'
-    '<div class="nf-a"><label for="na">Your address</label><input id="na" name="a" autocomplete="street-address" placeholder="Street address, city or ZIP code"></div>'
-    '<div class="nf-n"><label for="nn">What do you need?</label><select id="nn" name="n"><option value="">Any kind of help</option>%s</select></div>'
-    '<button class="btn" type="submit">Find closest help</button>'
-    '<button class="btn btn-ghost" type="button" id="nearme">📍 Use my location</button></form>'
+NEARFORM = ('<form id="nearform" class="nearform" role="search" aria-label="Search for help near you">'
+    '<div class="nf-loc"><button class="btn btn-ghost" type="button" id="nearme">📍 Use my location</button><span class="nf-or">or</span>'
+    '<div class="nf-a"><label for="na" class="sr">Type your address</label><input id="na" name="a" autocomplete="street-address" placeholder="Type your address, city or ZIP code"></div></div>'
+    '<div class="nf-row"><div class="nf-n"><label for="nn">What are you looking for?</label><select id="nn" name="n"><option value="">Any kind of help</option>%s</select></div>'
+    '<button class="btn" type="submit">Search</button></div></form>'
     '<p class="muted nf-note">We sort programs by distance from your address, nearest first, so neighborhood programs show up before countywide ones. '
     'Your address is not saved. It is sent to OpenStreetMap only to find its location.</p>') % opts
 main = ('<h1>Help <em>closest to you</em></h1><p class="lede">Enter your address and we\'ll list programs with an office near you, closest first, '
@@ -555,10 +555,14 @@ wr(os.path.join(ROOT, "near", "index.html"),
         "/near/", main, [("Home", "/"), ("Help near me", "/near/")]))
 indexed.add("/near/")
 fp = os.path.join(ROOT, "index.html"); s = rd(fp)
-homeform = ('<section class="nearhero"><h2 style="margin-top:0">Search by your address: closest help first</h2>' +
-            NEARFORM.replace('id="nearform"', 'id="nearform" action="/near/"').replace('id="nearme"', 'id="nearme-home"') + "</section>")
-s = put(s, "nearhero", homeform, '<form class="finder"')
-s = put(s, "nearjs", '<script>document.getElementById("nearform").addEventListener("submit",function(e){e.preventDefault();var f=e.target;location.href="/near/?a="+encodeURIComponent(f.a.value)+(f.n.value?"&n="+f.n.value:"")});document.getElementById("nearme-home").addEventListener("click",function(){location.href="/near/?me=1"})</script>', "</body>")
+# home page: just the address search (header nav, headline and county finder removed at Jason's request)
+s = re.sub(r'<header class="top">.*?</header>\n?', "", s, count=1, flags=re.S)
+s = re.sub(r'<h1>Find free help <em>near you</em> in Alabama\.</h1><p class="lede">.*?</p>\n?', "", s, count=1, flags=re.S)
+s = re.sub(r'<form class="finder" role="search" aria-label="Find help">.*?</form>', "", s, count=1, flags=re.S)
+homeform = ('<section class="nearhero"><h1 class="nh-title">Search for help near you</h1>' +
+            NEARFORM.replace('id="nearme"', 'id="nearme-home"') + "</section>")
+s = put(s, "nearhero", homeform, '<main id="main" class="wrap">', before=False)
+s = put(s, "nearjs", '<script>document.getElementById("nearform").addEventListener("submit",function(e){e.preventDefault();var f=e.target;location.href="/near/?a="+encodeURIComponent(f.a.value)+(f.n.value?"&n="+f.n.value:"")});document.getElementById("nearme-home").addEventListener("click",function(){var n=document.getElementById("nn").value;location.href="/near/?me=1"+(n?"&n="+n:"")})</script>', "</body>")
 wr(fp, s)
 fp = os.path.join(ROOT, "privacy", "index.html"); s = rd(fp)
 s = put(s, "nearpriv", '<h2>Address search</h2><p>When you search by address, your browser sends what you typed to OpenStreetMap (nominatim.openstreetmap.org) to find its location, then sorts programs on your device. We do not receive or save your address. "Use my location" works the same way and never leaves your device.</p>', "</main>")
@@ -577,9 +581,14 @@ CSS = """
 .post table{border-collapse:collapse;width:100%;margin:12px 0}.post td,.post th{border:1px solid var(--line);padding:8px;text-align:left}
 .lead label{display:block;font-weight:700;margin:0 0 12px}.lead input,.lead select,.lead textarea{display:block;width:100%;margin-top:6px;font:inherit;padding:12px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink)}
 .nearbar{background:#13304a;border-bottom:1px solid var(--line);font-size:15px}.nearbar .wrap{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding-top:8px;padding-bottom:8px}
-.nearform{background:var(--panel);border:1px solid var(--volt);border-radius:var(--radius);padding:20px;display:grid;grid-template-columns:2fr 1fr auto auto;gap:12px;align-items:end;margin:18px 0 6px}
+.nearform{background:var(--panel);border:1px solid var(--volt);border-radius:var(--radius);padding:20px;display:grid;gap:16px;margin:18px 0 6px}
+.nf-loc{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.nf-loc .nf-a{flex:1;min-width:220px}.nf-or{color:var(--mute);font-weight:700}
+.nf-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 .nearform label{display:block;font-weight:700;font-size:15px;margin-bottom:6px}.nearform input,.nearform select{width:100%;font:inherit;padding:12px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink)}
-@media(max-width:820px){.nearform{grid-template-columns:1fr}}.nf-note{font-size:15px;margin:0 0 18px}
+@media(max-width:620px){.nf-row{grid-template-columns:1fr}.nf-loc{flex-direction:column;align-items:stretch}.nf-or{text-align:center}}
+.nh-title{margin:28px 0 0}
+.nf-note{font-size:15px;margin:0 0 18px}
 .nearhero{margin:22px 0}.found{font-size:18px}.res.near{display:grid;grid-template-columns:70px 1fr;gap:14px}
 .res.near .dist{font:800 24px var(--display);color:var(--volt);text-align:center}.res.near .dist small{display:block;font-size:13px;color:var(--mute)}
 .lead .chk{font-weight:500;font-size:15px;display:flex;gap:10px;align-items:flex-start}.lead .chk input{width:auto;margin-top:4px}
