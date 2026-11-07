@@ -140,6 +140,8 @@ SAMPLE = rd(os.path.join(ROOT, "about", "index.html"))
 NAV_OLD = '<a href="/advertise/">Advertise</a><a class="pro" href="/for-organizations/">For organizations</a>'
 NAV_NEW = '<a href="/blog/">Guides</a><a href="/advertise/">Advertise</a><a class="pro" href="/for-organizations/">For organizations</a>'
 OGIMG = DOMAIN + "/assets/og.png"
+NEARBAR = ('<div class="nearbar"><div class="wrap"><span>📍 <b>Search by your address</b> and we\'ll list the closest help first, '
+           'starting in your neighborhood.</span><a class="btn btn-sm" href="/near/">Find help near me</a></div></div>')
 
 def fix_chrome(s):
     if '<a href="/blog/">' not in s.split("</nav>", 1)[0]:
@@ -152,6 +154,8 @@ def fix_chrome(s):
             '<meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image">'
             '<meta property="og:locale" content="en_US">' % OGIMG)
     s = put(s, "og", tags, "</head>")
+    bar = "" if 'id="nearform"' in s else NEARBAR
+    s = put(s, "nearbar", bar, '<main id="main"')
     return s
 
 def set_title(s, title, desc=None):
@@ -482,6 +486,82 @@ if '<meta name="robots"' not in s:
     s = s.replace("<title>", '<meta name="robots" content="noindex"><title>', 1)
 wr(fp, fix_chrome(s))
 
+
+# ---------------------------------------------------------------- closest-first (address) search
+ZIPS = json.load(open(os.path.join(SRC, "al_zips.json")))           # zip -> [lat, lon, county name]
+CIDX = list(COUNTIES)                                               # county slug order
+CNAME2I = {COUNTIES[c].lower(): i for i, c in enumerate(CIDX)}
+GEO = json.load(open(os.path.join(SRC, "geo.json"))) if os.path.exists(os.path.join(SRC, "geo.json")) else {}
+citypts = collections.defaultdict(list)
+try:
+    import zipcodes
+    for z in zipcodes.filter_by(state="AL"):
+        if z["zip_code"] in ZIPS:
+            citypts[z["city"].lower()].append(ZIPS[z["zip_code"]][:2])
+except ImportError:
+    pass
+RES = {}
+for (c, k), items in PAGES.items():
+    for i in items:
+        r = RES.setdefault(i["id"], dict(i, needs=set(), counties=set(), home=None))
+        r["needs"].add(k); r["counties"].add(c)
+rows = []; prec = collections.Counter()
+for rid, r in sorted(RES.items()):
+    a = r["addr"]
+    if not a or re.search(r"confidential|multiple sites|various|statewide", a, re.I):
+        continue
+    pt = None; pr = None
+    if rid in GEO:
+        pt, pr = GEO[rid], "s"
+    else:
+        zm = re.findall(r"\b(3[56]\d{3})\b", a)
+        if zm and zm[-1] in ZIPS:
+            pt, pr = ZIPS[zm[-1]][:2], "z"
+        else:
+            for city in sorted(citypts, key=len, reverse=True):
+                if re.search(r"\b" + re.escape(city) + r"\b", a.lower()):
+                    ps = citypts[city]; pt = [round(sum(p[0] for p in ps) / len(ps), 4), round(sum(p[1] for p in ps) / len(ps), 4)]; pr = "c"; break
+    if not pt:
+        continue
+    prec[pr] += 1
+    # home county = county of the point's nearest zip, if the program serves it
+    best = min(ZIPS.values(), key=lambda z: (z[0] - pt[0]) ** 2 + (z[1] - pt[1]) ** 2)
+    hc = NAME2SLUG.get(best[2].lower())
+    home = hc if hc in r["counties"] else sorted(r["counties"])[0]
+    k0 = [k for k in NEEDS if k in r["needs"]][0]
+    url = "/alabama/%s/%s/#r-%s" % (home, NEEDS[k0]["s"], rid)
+    rows.append([r["name"], r["phone"], a, pt[0], pt[1], ",".join(k for k in NEEDS if k in r["needs"]),
+                 sorted(CIDX.index(x) for x in r["counties"]), pr, url])
+nz = {z: [v[0], v[1], CNAME2I.get(v[2].lower())] for z, v in ZIPS.items()}
+wr(os.path.join(ROOT, "assets", "near.json"), json.dumps({"c": [[c, COUNTIES[c]] for c in CIDX], "z": nz, "r": rows}, separators=(",", ":"), ensure_ascii=False))
+needjs = json.dumps({k: [v["s"], SHORT[k]] for k, v in NEEDS.items()})
+opts = "".join('<option value="%s">%s</option>' % (k, E(v["t"])) for k, v in NEEDS.items())
+NEARFORM = ('<form id="nearform" class="nearform" role="search" aria-label="Find the closest help to your address">'
+    '<div class="nf-a"><label for="na">Your address</label><input id="na" name="a" autocomplete="street-address" placeholder="Street address, city or ZIP code"></div>'
+    '<div class="nf-n"><label for="nn">What do you need?</label><select id="nn" name="n"><option value="">Any kind of help</option>%s</select></div>'
+    '<button class="btn" type="submit">Find closest help</button>'
+    '<button class="btn btn-ghost" type="button" id="nearme">📍 Use my location</button></form>'
+    '<p class="muted nf-note">We sort programs by distance from your address, nearest first, so neighborhood programs show up before countywide ones. '
+    'Your address is not saved. It is sent to OpenStreetMap only to find its location.</p>') % opts
+main = ('<h1>Help <em>closest to you</em></h1><p class="lede">Enter your address and we\'ll list programs with an office near you, closest first, '
+        'starting in your neighborhood and working outward. Then see the countywide and statewide programs that also cover you.</p>' + NEARFORM +
+        '<div id="nearout" aria-live="polite"></div><script>window.NEAR_NEEDS=%s</script><script src="/assets/near.js" defer></script>' % needjs)
+wr(os.path.join(ROOT, "near", "index.html"),
+   page("Find Help Near Me in Alabama: Closest Programs to Your Address | " + SITE,
+        "Enter your address to see the closest help with bills, food, rent, repairs and more in Alabama, sorted by distance from your home.",
+        "/near/", main, [("Home", "/"), ("Help near me", "/near/")]))
+indexed.add("/near/")
+fp = os.path.join(ROOT, "index.html"); s = rd(fp)
+homeform = ('<section class="nearhero"><h2 style="margin-top:0">Search by your address: closest help first</h2>' +
+            NEARFORM.replace('id="nearform"', 'id="nearform" action="/near/"').replace('id="nearme"', 'id="nearme-home"') + "</section>")
+s = put(s, "nearhero", homeform, '<form class="finder"')
+s = put(s, "nearjs", '<script>document.getElementById("nearform").addEventListener("submit",function(e){e.preventDefault();var f=e.target;location.href="/near/?a="+encodeURIComponent(f.a.value)+(f.n.value?"&n="+f.n.value:"")});document.getElementById("nearme-home").addEventListener("click",function(){location.href="/near/?me=1"})</script>', "</body>")
+wr(fp, s)
+fp = os.path.join(ROOT, "privacy", "index.html"); s = rd(fp)
+s = put(s, "nearpriv", '<h2>Address search</h2><p>When you search by address, your browser sends what you typed to OpenStreetMap (nominatim.openstreetmap.org) to find its location, then sorts programs on your device. We do not receive or save your address. "Use my location" works the same way and never leaves your device.</p>', "</main>")
+wr(fp, s)
+print("near search:", len(rows), "programs placed", dict(prec))
+
 # ---------------------------------------------------------------- css
 CSS = """
 .serving{color:var(--mute);margin:-4px 0 0;max-width:760px}
@@ -493,6 +573,12 @@ CSS = """
 .post{max-width:760px}.post .meta{color:var(--mute);font-size:15px}.post h2{font-size:24px}.post li{margin:4px 0}
 .post table{border-collapse:collapse;width:100%;margin:12px 0}.post td,.post th{border:1px solid var(--line);padding:8px;text-align:left}
 .lead label{display:block;font-weight:700;margin:0 0 12px}.lead input,.lead select,.lead textarea{display:block;width:100%;margin-top:6px;font:inherit;padding:12px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink)}
+.nearbar{background:#13304a;border-bottom:1px solid var(--line);font-size:15px}.nearbar .wrap{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding-top:8px;padding-bottom:8px}
+.nearform{background:var(--panel);border:1px solid var(--volt);border-radius:var(--radius);padding:20px;display:grid;grid-template-columns:2fr 1fr auto auto;gap:12px;align-items:end;margin:18px 0 6px}
+.nearform label{display:block;font-weight:700;font-size:15px;margin-bottom:6px}.nearform input,.nearform select{width:100%;font:inherit;padding:12px;border-radius:10px;border:2px solid var(--line);background:var(--bg);color:var(--ink)}
+@media(max-width:820px){.nearform{grid-template-columns:1fr}}.nf-note{font-size:15px;margin:0 0 18px}
+.nearhero{margin:22px 0}.found{font-size:18px}.res.near{display:grid;grid-template-columns:70px 1fr;gap:14px}
+.res.near .dist{font:800 24px var(--display);color:var(--volt);text-align:center}.res.near .dist small{display:block;font-size:13px;color:var(--mute)}
 .lead .chk{font-weight:500;font-size:15px;display:flex;gap:10px;align-items:flex-start}.lead .chk input{width:auto;margin-top:4px}
 """
 fp = os.path.join(ROOT, "assets", "site.css"); s = rd(fp)
