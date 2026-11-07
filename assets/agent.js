@@ -1,4 +1,4 @@
-/* "Ask a quick question?" — chat + voice helper for Alabama Resource Directory.
+/* "Got a quick question? Click here" — chat + voice helper for Alabama Resource Directory.
    Runs entirely in the browser from /assets/agent-data.json. No account, no API key, nothing sent anywhere. */
 (function(){
 'use strict';
@@ -26,7 +26,7 @@ var chatSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-w
 function build(){
   var st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
   var bar=document.createElement('div'); bar.className='ask-bar';
-  bar.innerHTML='<button type="button" class="ask-btn" id="askOpen" aria-haspopup="dialog">'+chatSvg+'<span>Ask a quick question?</span></button><button type="button" class="ask-btn ask-mic" id="askVoice" aria-label="Ask by voice">'+micSvg+'</button>';
+  bar.innerHTML='<button type="button" class="ask-btn" id="askOpen" aria-haspopup="dialog">'+chatSvg+'<span>Got a quick question? Click here</span></button><button type="button" class="ask-btn ask-mic" id="askVoice" aria-label="Ask by voice">'+micSvg+'</button>';
   var strip=document.createElement('div'); strip.className='ask-strip'; var w=document.createElement('div'); w.className='wrap ask-strip-in';
   w.innerHTML='<span class="ask-hint">Need help fast? Type or talk. Answers come from our directory.</span>'; w.appendChild(bar); strip.appendChild(w);
   var hdr=$('header.top'); if(hdr) hdr.parentNode.insertBefore(strip,hdr); else document.body.prepend(strip);
