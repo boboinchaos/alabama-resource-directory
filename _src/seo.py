@@ -533,7 +533,10 @@ for rid, r in sorted(RES.items()):
     rows.append([r["name"], r["phone"], a, pt[0], pt[1], ",".join(k for k in NEEDS if k in r["needs"]),
                  sorted(CIDX.index(x) for x in r["counties"]), pr, url])
 nz = {z: [v[0], v[1], CNAME2I.get(v[2].lower())] for z, v in ZIPS.items()}
-wr(os.path.join(ROOT, "assets", "near.json"), json.dumps({"c": [[c, COUNTIES[c]] for c in CIDX], "z": nz, "r": rows}, separators=(",", ":"), ensure_ascii=False))
+NEARJSON = json.dumps({"c": [[c, COUNTIES[c]] for c in CIDX], "z": nz, "r": rows}, separators=(",", ":"), ensure_ascii=False)
+wr(os.path.join(ROOT, "assets", "near.json"), NEARJSON)
+import hashlib
+NEARVER = hashlib.md5(NEARJSON.encode() + rd(os.path.join(ROOT, "assets", "near.js")).encode()).hexdigest()[:8]
 needjs = json.dumps({k: [v["s"], SHORT[k]] for k, v in NEEDS.items()})
 opts = "".join('<option value="%s">%s</option>' % (k, E(v["t"])) for k, v in NEEDS.items())
 NEARFORM = ('<form id="nearform" class="nearform" role="search" aria-label="Find the closest help to your address">'
@@ -545,7 +548,7 @@ NEARFORM = ('<form id="nearform" class="nearform" role="search" aria-label="Find
     'Your address is not saved. It is sent to OpenStreetMap only to find its location.</p>') % opts
 main = ('<h1>Help <em>closest to you</em></h1><p class="lede">Enter your address and we\'ll list programs with an office near you, closest first, '
         'starting in your neighborhood and working outward. Then see the countywide and statewide programs that also cover you.</p>' + NEARFORM +
-        '<div id="nearout" aria-live="polite"></div><script>window.NEAR_NEEDS=%s</script><script src="/assets/near.js" defer></script>' % needjs)
+        '<div id="nearout" aria-live="polite"></div><script>window.NEAR_NEEDS=%s;window.NEAR_VER="%s"</script><script src="/assets/near.js?v=%s" defer></script>' % (needjs, NEARVER, NEARVER))
 wr(os.path.join(ROOT, "near", "index.html"),
    page("Find Help Near Me in Alabama: Closest Programs to Your Address | " + SITE,
         "Enter your address to see the closest help with bills, food, rent, repairs and more in Alabama, sorted by distance from your home.",

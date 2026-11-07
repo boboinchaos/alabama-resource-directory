@@ -5,7 +5,7 @@
   var out = document.getElementById('nearout'), D = null;
   var NEED = window.NEAR_NEEDS || {};
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  function load(cb) { if (D) return cb(); fetch('/assets/near.json').then(function (r) { return r.json(); }).then(function (j) { D = j; cb(); }).catch(function () { msg('Sorry, the directory did not load. Please try again.'); }); }
+  function load(cb) { if (D) return cb(); fetch('/assets/near.json?v=' + (window.NEAR_VER || '')).then(function (r) { return r.json(); }).then(function (j) { D = j; cb(); }).catch(function () { msg('Sorry, the directory did not load. Please try again.'); }); }
   function msg(h) { out.innerHTML = '<p class="muted">' + h + '</p>'; }
   function mi(a, b, c, d) { var R = 3958.8, r = Math.PI / 180, x = (c - a) * r, y = (d - b) * r; var h = Math.sin(x / 2) * Math.sin(x / 2) + Math.cos(a * r) * Math.cos(c * r) * Math.sin(y / 2) * Math.sin(y / 2); return 2 * R * Math.asin(Math.sqrt(h)); }
   function zipOf(s) { var m = String(s).match(/\b(3[56]\d{3})\b/); return m ? m[1] : null; }
