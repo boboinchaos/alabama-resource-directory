@@ -17,7 +17,7 @@ for c in sorted(os.listdir(f'{R}/alabama')):
             name=txt(re.search(r'<h3>(.*?)</h3>',a).group(1))
             badge=txt(re.search(r'<span class="badge[^"]*">(.*?)</span>',a).group(1))
             local='class="badge local"' in a
-            ph=re.search(r'<a class="phone" href="tel:(\d+)">(.*?)</a>',a)
+            ph=re.search(r'<a class="phone" href="tel:([\d,]+)">(.*?)</a>',a)
             addr=re.search(r'<dt>Where</dt><dd>(.*?)</dd>',a)
             desc=re.search(r'</div><p>(.*?)</p>',a)
             who=re.search(r'<dt>Who</dt><dd>(.*?)</dd>',a)

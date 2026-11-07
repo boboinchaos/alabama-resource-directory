@@ -29,6 +29,7 @@ CHECKED = datetime.date.today().strftime("%B %Y")
 # ---- CONFIG: paste a GoHighLevel form link here when it exists ----------------
 REPAIR_FORM_URL = ""          # e.g. https://api.leadconnectorhq.com/widget/form/XXXX
 CONTACT_EMAIL = "hello@alabamaresourcedirectory.com"
+ADSENSE_ID = ""               # e.g. ca-pub-1234567890123456 (turns on Google Auto ads + ads.txt)
 # -----------------------------------------------------------------------------
 
 E = lambda s: html.escape(str(s), quote=True)
@@ -89,7 +90,7 @@ def parse_page(s):
     items = []
     for rid, a in re.findall(r'<article class="res" id="r-([^"]+)">(.*?)</article>', s, re.S):
         g = lambda p: (re.search(p, a, re.S) or [None, ""])[1] if re.search(p, a, re.S) else ""
-        ph = re.search(r'<a class="phone" href="tel:(\d+)">(.*?)</a>', a)
+        ph = re.search(r'<a class="phone" href="tel:([\d,]+)">(.*?)</a>', a)
         items.append(dict(id=rid, html=a, name=T(g(r"<h3>(.*?)</h3>")),
             badge=T(g(r'<span class="badge[^"]*">(.*?)</span>')), local='class="badge local"' in a,
             phone=T(ph.group(2)) if ph else "", addr=T(g(r"<dt>Where</dt><dd>(.*?)</dd>")),
@@ -156,6 +157,8 @@ def fix_chrome(s):
             '<meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image">'
             '<meta property="og:locale" content="en_US">' % OGIMG)
     s = put(s, "og", tags, "</head>")
+    ads = ('<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=%s" crossorigin="anonymous"></script>' % ADSENSE_ID) if ADSENSE_ID else ""
+    s = put(s, "adsense", ads, "</head>")
     for a in ("site.css", "site.js", "agent.js"):
         s = re.sub(r'(/assets/%s)(\?v=[0-9a-f]+)?"' % re.escape(a), lambda m: m.group(1) + "?v=" + ASSETV[a] + '"', s)
     bar = "" if 'id="nearform"' in s else NEARBAR
@@ -612,6 +615,8 @@ for u in urls:
     sm.append("<url><loc>%s%s</loc><lastmod>%s</lastmod><priority>%s</priority></url>" % (DOMAIN, u, TODAY, pri(u)))
 sm.append("</urlset>")
 wr(os.path.join(ROOT, "sitemap.xml"), "\n".join(sm) + "\n")
+if ADSENSE_ID:
+    wr(os.path.join(ROOT, "ads.txt"), "google.com, %s, DIRECT, f08c47fec0942fa0\n" % ADSENSE_ID.replace("ca-pub-", "pub-"))
 wr(os.path.join(ROOT, "robots.txt"), "User-agent: *\nAllow: /\nDisallow: /demo/\nDisallow: /_src/\n\nSitemap: %s/sitemap.xml\n" % DOMAIN)
 
 print("county+need pages:", len(PAGES), "| noindexed (no local listing):", len(noindexed),
